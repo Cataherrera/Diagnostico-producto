@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico Circular C2C</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .icon {
+            width: 24px;
+            height: 24px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .section-complete {
+            opacity: 0.6;
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app" class="max-w-4xl mx-auto p-6 bg-white min-h-screen">
+        <!-- El contenido se generará aquí con JavaScript -->
+    </div>
+
+    <script>
+        // Estado de la aplicación
+        let appState = {
+            responses: {},
+            currentSection: 0,
+            showResults: false
+        };
+
+        // Definición de secciones y preguntas
+        const sections = [
+            {
+                id: 'materials',
+                title: 'Materiales Seguros',
+                icon: 'leaf',
+                description: 'Evalúa la seguridad y circularidad de los materiales utilizados',
+                questions: [
+                    {
+                        id: 'material_origin',
+                        question: '¿Conoces el origen y composición de todos tus materiales?',
+                        weight: 3
+                    },
+                    {
+                        id: 'material_safety',
+                        question: '¿Todos los materiales utilizados son seguros para la salud humana y el medio ambiente?',
+                        weight: 3
+                    },
+                    {
+                        id: 'toxic_elimination',
+                        question: '¿Has eliminado materiales tóxicos o problemáticos de tu proceso?',
+                        weight: 3
+                    },
+                    {
+                        id: 'renewable_materials',
+                        question: '¿Utilizas materiales renovables o biodegradables cuando es posible?',
+                        weight: 2
+                    }
+                ]
+            },
+            {
+                id: 'design',
+                title: 'Diseño Circular',
+                icon: 'recycle',
+                description: 'Evalúa cómo el diseño facilita la circularidad',
+                questions: [
+                    {
+                        id: 'disassembly',
+                        question: '¿El producto está diseñado para ser fácilmente desmontable?',
+                        weight: 3
+                    },
+                    {
+                        id: 'durability',
+                        question: '¿El producto está diseñado para durar y ser reparable?',
+                        weight: 2
+                    },
+                    {
+                        id: 'modularity',
+                        question: '¿El diseño permite actualizaciones o mejoras modulares?',
+                        weight: 2
+                    },
+                    {
+                        id: 'end_of_life',
+                        question: '¿Has planificado qué sucede con el producto al final de su vida útil?',
+                        weight: 3
+                    }
+                ]
+            },
+            {
+                id: 'energy',
+                title: 'Energía Renovable',
+                icon: 'zap',
+                description: 'Evalúa el uso de energía renovable en el proceso',
+                questions: [
+                    {
+                        id: 'renewable_energy',
+                        question: '¿Utilizas energía renovable en tu proceso productivo?',
+                        weight: 3
+                    },
+                    {
+                        id: 'energy_efficiency',
+                        question: '¿Has optimizado el consumo energético de tu proceso?',
+                        weight: 2
+                    },
+                    {
+                        id: 'carbon_positive',
+                        question: '¿Tu proceso compensa o reduce las emisiones de carbono que genera?',
+                        weight: 3
+                    },
+                    {
+                        id: 'energy_recovery',
+                        question: '¿Recuperas o reutilizas energía en tu proceso?',
+                        weight: 2
+                    }
+                ]
+            },
+            {
+                id: 'water',
+                title: 'Gestión del Agua',
+                icon: 'droplets',
+                description: 'Evalúa la gestión circular del agua',
+                questions: [
+                    {
+                        id: 'water_quality',
+                        question: '¿El agua que descargas está limpia o más limpia que cuando llegó?',
+                        weight: 3
+                    },
+                    {
+                        id: 'water_efficiency',
+                        question: '¿Has optimizado el uso del agua en tu proceso?',
+                        weight: 2
+                    },
+                    {
+                        id: 'water_reuse',
+                        question: '¿Reutilizas o reciclas agua en tu proceso?',
+                        weight: 2
+                    },
+                    {
+                        id: 'water_treatment',
+                        question: '¿Tienes sistemas de tratamiento de agua apropiados?',
+                        weight: 2
+                    }
+                ]
+            },
+            {
+                id: 'social',
+                title: 'Justicia Social',
+                icon: 'users',
+                description: 'Evalúa el impacto social y la equidad',
+                questions: [
+                    {
+                        id: 'fair_labor',
+                        question: '¿Garantizas condiciones laborales justas y seguras?',
+                        weight: 3
+                    },
+                    {
+                        id: 'community_impact',
+                        question: '¿Tu emprendimiento beneficia a la comunidad local?',
+                        weight: 2
+                    },
+                    {
+                        id: 'supply_chain',
+                        question: '¿Tu cadena de suministro respeta los derechos humanos?',
+                        weight: 3
+                    },
+                    {
+                        id: 'accessibility',
+                        question: '¿Tu producto/servicio es accesible para diferentes grupos sociales?',
+                        weight: 2
+                    }
+                ]
+            }
+        ];
+
+        // Funciones de utilidad para iconos SVG
+        function getIconSVG(iconName) {
+            const icons = {
+                leaf: '<svg class="icon"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2.5 2 5.2 2 7.5C21 15.3 16.3 20 11 20z"/><path d="M9.8 6.1c-1.8-1.2-2.8-3.3-2.8-5.1"/></svg>',
+                recycle: '<svg class="icon"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 7.196 9.5 3.1 10.598"/><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843"/><path d="m13.378 9.633 4.096 1.098 1.097-4.096"/></svg>',
+                zap: '<svg class="icon"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10 13,2"/></svg>',
+                droplets: '<svg class="icon"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2.04 4.6 4.14 6.12A5.11 5.11 0 0 1 16 10.5"/></svg>',
+                users: '<svg class="icon"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m22 21-2-2"/><path d="M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3z"/></svg>',
+                checkCircle: '<svg class="icon"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>',
+                alertCircle: '<svg class="icon"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+                xCircle: '<svg class="icon"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+                barChart: '<svg class="icon"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>'
+            };
+            return icons[iconName] || '';
+        }
+
+        // Funciones de cálculo
+        function calculateSectionScore(section) {
+            const sectionQuestions = section.questions;
+            
+            const applicableQuestions = sectionQuestions.filter(q => {
+                const response = appState.responses[q.id];
+                return response !== -2;
+            });
+            
+            if (applicableQuestions.length === 0) return 100;
+            
+            const totalWeight = applicableQuestions.reduce((sum, q) => sum + q.weight, 0);
+            
+            const achievedScore = applicableQuestions.reduce((sum, q) => {
+                let response = appState.responses[q.id] || 0;
+                
+                if (response === -1) response = 0;
+                
+                if (section.id === 'materials') {
+                    let materialOriginScore = appState.responses['material_origin'] || 0;
+                    if (materialOriginScore === -1) materialOriginScore = 0;
+                    
+                    if (materialOriginScore < 2) {
+                        if (q.id === 'material_safety' || q.id === 'toxic_elimination') {
+                            response = 0;
+                        }
+                    }
+                }
+                
+                return sum + (response * q.weight);
+            }, 0);
+            
+            return totalWeight > 0 ? (achievedScore / (totalWeight * 3)) * 100 : 0;
+        }
+
+        function calculateOverallScore() {
+            const sectionScores = sections.map(section => calculateSectionScore(section));
+            return sectionScores.reduce((sum, score) => sum + score, 0) / sections.length;
+        }
+
+        function getScoreColor(score) {
+            if (score >= 70) return 'text-green-600';
+            if (score >= 50) return 'text-yellow-600';
+            return 'text-red-600';
+        }
+
+        function getScoreIcon(score) {
+            if (score >= 70) return getIconSVG('checkCircle');
+            if (score >= 50) return getIconSVG('alertCircle');
+            return getIconSVG('xCircle');
+        }
+
+        function getRecommendations(score) {
+            if (score >= 70) {
+                return [
+                    "¡Excelente! Tu emprendimiento muestra un alto nivel de circularidad",
+                    "Considera certificaciones C2C para validar tu enfoque",
+                    "Comparte tu experiencia como caso de éxito",
+                    "Busca oportunidades de mejora continua en áreas específicas"
+                ];
+            } else if (score >= 50) {
+                return [
+                    "Buen progreso hacia la circularidad, pero hay áreas de mejora",
+                    "Prioriza las secciones con menor puntuación",
+                    "Considera alianzas estratégicas para mejorar tu cadena de valor",
+                    "Desarrolla un plan de transición circular gradual"
+                ];
+            } else {
+                return [
+                    "Tu emprendimiento necesita una transformación significativa hacia la circularidad",
+                    "Comienza por rediseñar productos/servicios con principios C2C",
+                    "Busca asesoría especializada en economía circular",
+                    "Considera el modelo de negocio circular desde la base"
+                ];
+            }
+        }
+
+        // Funciones de interacción
+        function handleResponse(questionId, value) {
+            appState.responses[questionId] = parseInt(value);
+            render();
+        }
+
+        function nextSection() {
+            if (appState.currentSection < sections.length - 1) {
+                appState.currentSection++;
+            } else {
+                appState.showResults = true;
+            }
+            render();
+        }
+
+        function prevSection() {
+            if (appState.currentSection > 0) {
+                appState.currentSection--;
+            }
+            render();
+        }
+
+        function resetTool() {
+            appState = {
+                responses: {},
+                currentSection: 0,
+                showResults: false
+            };
+            render();
+        }
+
+        // Función de renderizado principal
+        function render() {
+            const app = document.getElementById('app');
+            
+            if (appState.showResults) {
+                app.innerHTML = renderResults();
+            } else {
+                app.innerHTML = renderSurvey();
+            }
+        }
+
+        function renderResults() {
+            const overallScore = calculateOverallScore();
+            const recommendations = getRecommendations(overallScore);
+
+            let sectionsHTML = '';
+            sections.forEach(section => {
+                const score = calculateSectionScore(section);
+                const scoreColor = score >= 70 ? 'bg-green-500' : score >= 50 ? 'bg-yellow-500' : 'bg-red-500';
+                
+                sectionsHTML += `
+                    <div class="bg-white border rounded-lg p-4 shadow-sm">
+                        <div class="flex items-center mb-3">
+                            ${getIconSVG(section.icon)}
+                            <h3 class="font-semibold ml-2">${section.title}</h3>
+                        </div>
+                        <div class="flex items-center">
+                            ${getScoreIcon(score)}
+                            <span class="text-xl font-bold ml-2 ${getScoreColor(score)}">
+                                ${score.toFixed(1)}%
+                            </span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+                            <div class="h-2 rounded-full ${scoreColor}" style="width: ${score}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            let recommendationsHTML = '';
+            recommendations.forEach(rec => {
+                recommendationsHTML += `
+                    <li class="flex items-start">
+                        <span class="text-blue-600 mr-2">•</span>
+                        <span class="text-gray-700">${rec}</span>
+                    </li>
+                `;
+            });
+
+            return `
+                <div class="fade-in">
+                    <div class="text-center mb-8">
+                        <h1 class="text-3xl font-bold text-gray-800 mb-2">Diagnóstico Circular C2C</h1>
+                        <p class="text-gray-600">Resultados del Análisis</p>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-8">
+                        <div class="flex items-center justify-center mb-4">
+                            ${getScoreIcon(overallScore)}
+                            <span class="text-4xl font-bold ml-2 ${getScoreColor(overallScore)}">
+                                ${overallScore.toFixed(1)}%
+                            </span>
+                        </div>
+                        <h2 class="text-xl font-semibold text-center text-gray-800 mb-2">
+                            Puntuación General de Circularidad
+                        </h2>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                        ${sectionsHTML}
+                    </div>
+
+                    <div class="bg-gray-50 rounded-lg p-6 mb-6">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center">
+                            ${getIconSVG('barChart')}
+                            <span class="ml-2">Recomendaciones Estratégicas</span>
+                        </h3>
+                        <ul class="space-y-2">
+                            ${recommendationsHTML}
+                        </ul>
+                    </div>
+
+                    <div class="text-center">
+                        <button
+                            onclick="resetTool()"
+                            class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            Realizar Nuevo Diagnóstico
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSurvey() {
+            const currentSectionData = sections[appState.currentSection];
+            const progress = ((appState.currentSection + 1) / sections.length) * 100;
+
+            let questionsHTML = '';
+            currentSectionData.questions.forEach((question, index) => {
+                const isConditionalQuestion = currentSectionData.id === 'materials' && 
+                    (question.id === 'material_safety' || question.id === 'toxic_elimination') &&
+                    (appState.responses['material_origin'] || 0) < 2;
+
+                const warningHTML = isConditionalQuestion ? `
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                        <p class="text-sm text-yellow-800">
+                            ⚠️ <strong>Nota:</strong> Esta pregunta requiere conocer primero el origen y composición de tus materiales para ser evaluada de manera confiable.
+                        </p>
+                    </div>
+                ` : '';
+
+                const responseOptions = [
+                    { value: 0, label: 'No', color: 'red' },
+                    { value: 1, label: 'Parcial', color: 'yellow' },
+                    { value: 2, label: 'Mayormente', color: 'green' },
+                    { value: 3, label: 'Sí', color: 'green' }
+                ];
+
+                const additionalOptions = [
+                    { value: -1, label: 'No lo sé', color: 'gray' },
+                    { value: -2, label: 'No aplica', color: 'blue' }
+                ];
+
+                let mainOptionsHTML = '';
+                responseOptions.forEach(option => {
+                    const isSelected = appState.responses[question.id] === option.value;
+                    const selectedClass = isSelected ? `border-${option.color}-500 bg-${option.color}-50` : 'border-gray-200 hover:border-gray-300';
+                    
+                    mainOptionsHTML += `
+                        <button
+                            onclick="handleResponse('${question.id}', ${option.value})"
+                            class="p-3 rounded-lg border-2 transition-all ${selectedClass} ${isConditionalQuestion ? 'cursor-help' : ''}"
+                        >
+                            <div class="text-center">
+                                <div class="font-medium">${option.value}</div>
+                                <div class="text-sm text-gray-600">${option.label}</div>
+                            </div>
+                        </button>
+                    `;
+                });
+
+                let additionalOptionsHTML = '';
+                additionalOptions.forEach(option => {
+                    const isSelected = appState.responses[question.id] === option.value;
+                    const selectedClass = isSelected ? `border-${option.color}-500 bg-${option.color}-50` : 'border-gray-200 hover:border-gray-300';
+                    
+                    additionalOptionsHTML += `
+                        <button
+                            onclick="handleResponse('${question.id}', ${option.value})"
+                            class="p-2 rounded-lg border-2 transition-all ${selectedClass}"
+                        >
+                            <div class="text-center">
+                                <div class="text-sm font-medium text-gray-700">${option.label}</div>
+                            </div>
+                        </button>
+                    `;
+                });
+
+                questionsHTML += `
+                    <div class="bg-white border rounded-lg p-6 shadow-sm ${isConditionalQuestion ? 'section-complete' : ''}">
+                        <h3 class="text-lg font-medium mb-4 text-gray-800">
+                            ${index + 1}. ${question.question}
+                        </h3>
+                        
+                        ${warningHTML}
+                        
+                        <div class="grid grid-cols-3 gap-2 mb-4">
+                            ${mainOptionsHTML}
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-2">
+                            ${additionalOptionsHTML}
+                        </div>
+                    </div>
+                `;
+            });
+
+            return `
+                <div class="fade-in">
+                    <div class="text-center mb-8">
+                        <h1 class="text-3xl font-bold text-gray-800 mb-2">Diagnóstico Circular C2C</h1>
+                        <p class="text-gray-600">Herramienta de Análisis de Ciclo de Vida Circular</p>
+                    </div>
+
+                    <div class="mb-6">
+                        <div class="flex justify-between text-sm text-gray-500 mb-2">
+                            <span>Progreso</span>
+                            <span>${appState.currentSection + 1} de ${sections.length}</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: ${progress}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 mb-8">
+                        <div class="flex items-center mb-4">
+                            ${getIconSVG(currentSectionData.icon)}
+                            <h2 class="text-2xl font-bold ml-3">${currentSectionData.title}</h2>
+                        </div>
+                        <p class="text-gray-700">${currentSectionData.description}</p>
+                    </div>
+
+                    <div class="space-y-6">
+                        ${questionsHTML}
+                    </div>
+
+                    <div class="flex justify-between mt-8">
+                        <button
+                            onclick="prevSection()"
+                            ${appState.currentSection === 0 ? 'disabled' : ''}
+                            class="px-6 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                        >
+                            Anterior
+                        </button>
+                        <button
+                            onclick="nextSection()"
+                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            ${appState.currentSection === sections.length - 1 ? 'Ver Resultados' : 'Siguiente'}
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Inicializar la aplicación
+        document.addEventListener('DOMContentLoaded', function() {
+            render();
+        });
+    </script>
+</body>
+</html>
